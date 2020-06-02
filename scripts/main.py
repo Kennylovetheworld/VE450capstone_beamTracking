@@ -5,12 +5,13 @@ from data import DataFeed
 import torchvision.transforms as trf
 from torch.utils.data import DataLoader
 import scipy.io as sio
+import os.path as path
 import matplotlib.pyplot as plt
 from skimage import io, transform
 
 
 # Experiment options:
-
+data_dir = path.join(path.dirname(path.dirname(__file__)), 'data', 'dev_dataset_csv')
 options_dict = {
     'tag': 'Exp1_beam_seq_pred_no_images',
     'operation_mode': 'beams',
@@ -20,8 +21,8 @@ options_dict = {
     'test_ratio': 1,
     'img_mean': (0.4905,0.4938,0.5285),
     'img_std':(0.05922,0.06468,0.06174),
-    'trn_data_file': 'train_set.csv',
-    'val_data_file': 'val_set.csv',
+    'trn_data_file': data_dir+'/train_set.csv',
+    'val_data_file': data_dir+'/val_set.csv',
     'results_file': 'five_beam_results_beam_only_2layeers.mat',
 
     # Net:
@@ -40,7 +41,7 @@ options_dict = {
     'gpu_idx': 0,
     'solver': 'Adam',
     'shf_per_epoch': True,
-    'num_epochs': 100,
+    'num_epochs': 10,
     'batch_size':5000,
     'val_batch_size':1000,
     'lr': 1e-3,
