@@ -7,13 +7,15 @@ import cv2
 import random
 from skimage import io
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 ############### Create data sample list #################
 def create_samples(root, shuffle=True, nat_sort=False):
+	print('Creating data sample list...')
 	f = pd.read_csv(root)
 	data_samples = []
-	for idx, row in f.iterrows():
+	for idx, row in tqdm(f.iterrows(), desc='loading data sample', ncols=100, total=len(f)):
 		beams = row.values[0:13].astype(np.float32)
 		img_paths = row.values[13:]
 		for i, path in enumerate(img_paths):
@@ -62,8 +64,9 @@ class DataFeed(Dataset):
 			beams[i] = torch.tensor(x, requires_grad=False)
 		images = []
 		for dp in sample[:self.inp_seq]:
-			image = cv2.imread(dp[0])
+			image = io.imread(dp[0])
 			# import pdb; pdb.set_trace()
+			# image2 = cv2.imread(dp[0])
 			image = self.transform(image)
 			images.append(image)
 		return beams
