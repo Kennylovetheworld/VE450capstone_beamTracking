@@ -72,7 +72,6 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             train_loss = criterion(out, targ)  # (pred, target)
             train_loss.backward()
             opt.step()
-            import pdb; pdb.set_trace()
             out = out.view(batch_size,options_dict['out_seq'],options_dict['cb_size'])
             pred_beams = torch.argmax(out,dim=2)
             targ = targ.view(batch_size,options_dict['out_seq'])
