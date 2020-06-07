@@ -63,7 +63,7 @@ class DataFeed(Dataset):
 		images = []
 		for dp in sample[:self.inp_seq]:
 			image = cv2.imread(dp[0])
-			import pdb; pdb.set_trace()
+			# import pdb; pdb.set_trace()
 			image = self.transform(image)
 			images.append(image)
 		return beams
