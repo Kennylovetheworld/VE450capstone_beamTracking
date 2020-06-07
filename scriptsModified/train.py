@@ -4,7 +4,7 @@ import torch.optim as optimizer
 # from torch.utils.data import DataLoader
 import numpy as np
 import time
-import pdb;
+import pdb
 
 def modelTrain(net,trn_loader,val_loader,options_dict):
     """
@@ -52,10 +52,11 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
+        pdb.set_trace()
 
         # Training:
         # ---------
-        for batch, y in enumerate(trn_loader):
+        for batch, (y, img) in enumerate(trn_loader):
 
             itr += 1
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)

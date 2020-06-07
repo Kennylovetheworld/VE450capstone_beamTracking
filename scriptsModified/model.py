@@ -22,15 +22,15 @@ class RecNet(nn.Module):
 
         # Define layers
         self.gru = nn.GRU(inp_dim,hid_dim,num_layers,batch_first=True,dropout=drop_prob)
+        self.img_gru = nn.GRU(cnn_channels[-1],hid_dim,num_layers,batch_first=True,dropout=drop_prob)
         self.classifier = nn.Linear(hid_dim,out_dim)
         self.relu = nn.ReLU()
         self.image_base = nn.Sequential(
             nn.Conv2d(3,cnn_channels[0],3,padding=1),
             nn.ReLU(), nn.MaxPool2d(2),
             nn.Conv2d(cnn_channels[0],cnn_channels[1],3,padding=1),
-            nn.ReLU(), nn.MaxPool2d(2)
+            nn.ReLU(), nn.MaxPool2d(2), nn.AdaptiveAvgPool2d(1)
         )
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
         # self.softmax = nn.Softmax(dim=1)--> Softmax is implicitly implemented into the cross entropy loss
 
     def forward(self,x,h):

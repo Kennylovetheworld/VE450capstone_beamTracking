@@ -3,9 +3,9 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-import cv2
+import pickle
 import random
-from skimage import io
+from skimage import io, util
 from torch.utils.data import Dataset
 
 
@@ -17,8 +17,8 @@ def create_samples(root, shuffle=True, nat_sort=False):
 		beams = row.values[0:13].astype(np.float32)
 		img_paths = row.values[13:]
 		for i, path in enumerate(img_paths):
-			path = path.replace("\\", "/")
-			img_paths[i] = '../data/dev_dataset_csv/'+path
+			img_paths[i] = path.replace("\\", "/")
+			# img_paths[i] = '../data/dev_dataset_csv/'+path
 		# import pdb; pdb.set_trace()
 		sample = list( zip(img_paths,beams) )
 		data_samples.append(sample)
@@ -48,6 +48,9 @@ class DataFeed(Dataset):
 		self.transform = transform
 		self.seq_len = n
 		self.img_dim = img_dim
+		imagefile = '../data/dev_dataset_csv/train_data.pkl'
+		with open(imagefile, 'rb') as inputf:
+			self.images = pickle.load(inputf)
 
 	def __len__(self):
 		return len(self.samples)
@@ -62,11 +65,20 @@ class DataFeed(Dataset):
 			beams[i] = torch.tensor(x, requires_grad=False)
 		images = []
 		for dp in sample[:self.inp_seq]:
-			image = cv2.imread(dp[0])
+			instances = dp[0].find('instance')
+			instanceb = dp[0].find('/cam')
+			camb = dp[0].find('.jpg')
+			instance = int(dp[0][instances + 8 : instanceb])
+			cam = int(dp[0][instanceb + 4 : camb])
 			# import pdb; pdb.set_trace()
+			image = self.images[(instance - 1) * 6 + cam - 1]
+			image = util.img_as_float(image)
+			image = torch.from_numpy(image)
+			image = image.permute(2, 0, 1)
 			image = self.transform(image)
 			images.append(image)
-		return beams
+		images = torch.stack(images, dim=0)
+		return (beams, images)
 
 #hf = h5py.File('data/dev_dataset_h5/dev_dataset_h5/train_set.h5','r') as f
 

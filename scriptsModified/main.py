@@ -9,7 +9,7 @@ import os.path as path
 import matplotlib.pyplot as plt
 from skimage import io, transform
 
-import pdb; pdb.set_trace() # For debug model
+import pdb # For debug model
 
 # Experiment options:
 data_dir = path.join(path.dirname(path.dirname(__file__)), 'data', 'dev_dataset_csv')
@@ -64,23 +64,23 @@ options_dict = {
 resize = trf.Resize((options_dict['img_dim'][1],options_dict['img_dim'][2]))
 normalize = trf.Normalize(mean=options_dict['img_mean'],
                           std=options_dict['img_std'])
-transf = trf.Compose([
-    trf.ToPILImage(),
-    resize,
-    trf.ToTensor(),
-    normalize
-])
+# transf = trf.Compose([
+#     trf.ToPILImage(),
+#     resize,
+#     trf.ToTensor(),
+#     normalize
+# ])
 trn_feed = DataFeed(root_dir=options_dict['trn_data_file'],
                      n=options_dict['inp_seq']+options_dict['out_seq'],
                      img_dim=tuple(options_dict['img_dim']),
-                     transform=transf)
+                     transform=normalize)
 trn_loader = DataLoader(trn_feed,batch_size=1000)
 options_dict['train_size'] = trn_feed.__len__()
 
 val_feed = DataFeed(root_dir=options_dict['val_data_file'],
                      n=options_dict['inp_seq']+options_dict['out_seq'],
                      img_dim=tuple(options_dict['img_dim']),
-                     transform=transf)
+                     transform=normalize)
 val_loader = DataLoader(val_feed,batch_size=1000)
 options_dict['test_size'] = val_feed.__len__()
 
