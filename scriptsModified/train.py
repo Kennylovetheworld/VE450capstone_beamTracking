@@ -57,7 +57,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
 
         # Training:
         # ---------
-        for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100, total= int(options_dict['train_size']/options_dict['batch_size'])):
+        for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100):
             itr += 1
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
@@ -107,7 +107,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 batch_score = 0
                 
                 with torch.no_grad():
-                    for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100, total= int(options_dict['test_size']/options_dict['batch_size'])):
+                    for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()
