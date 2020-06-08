@@ -57,7 +57,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
 
         # Training:
         # ---------
-        for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100, total= options_dict['train_size']):
+        for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100, total= int(options_dict['train_size']/options_dict['batch_size'])):
             itr += 1
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
@@ -89,7 +89,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 running_trn_top_1_score.append(top_1_score.item())
                 train_loss_ind.append(itr)
             if np.mod(itr, options_dict['display_freq']) == 0:  # Display frequency
-                pdb.set_trace()
+                # pdb.set_trace()
                 print(
                     'Epoch No. {0}--Iteration No. {1}-- Mini-batch loss = {2:10.9f}, Top-1 accuracy = {3:5.4f}, Top-1 score = {4:5.4f}'.format(
                     epoch + 1,
@@ -107,7 +107,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 batch_score = 0
                 
                 with torch.no_grad():
-                    for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100, total= options_dict['test_size']):
+                    for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100, total= int(options_dict['test_size']/options_dict['batch_size'])):
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()
