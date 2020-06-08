@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 import pickle
 import random
-from skimage import io, util
+from skimage import io, util, transform
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
