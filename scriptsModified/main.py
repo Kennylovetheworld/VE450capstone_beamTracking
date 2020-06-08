@@ -44,7 +44,7 @@ options_dict = {
     'solver': 'Adam',
     'shf_per_epoch': True,
     'num_epochs': 10,
-    'batch_size':10,
+    'batch_size':512,
     'val_batch_size':1000,
     'lr': 1e-3,
     'lr_sch': [200],
@@ -61,7 +61,7 @@ options_dict = {
 
 # Fetch training data
 
-resize = trf.Resize((options_dict['img_dim'][1],options_dict['img_dim'][2]))
+# resize = trf.Resize((options_dict['img_dim'][1],options_dict['img_dim'][2]))
 normalize = trf.Normalize(mean=options_dict['img_mean'],
                           std=options_dict['img_std'])
 # transf = trf.Compose([
@@ -73,7 +73,7 @@ normalize = trf.Normalize(mean=options_dict['img_mean'],
 trn_feed = DataFeed(root_dir=options_dict['trn_data_file'],
                      n=options_dict['inp_seq']+options_dict['out_seq'],
                      img_dim=tuple(options_dict['img_dim']),
-                     transform=transf)
+                     transform=normalize)
 trn_loader = DataLoader(trn_feed, batch_size=options_dict['batch_size'])
 options_dict['train_size'] = trn_feed.__len__()
 

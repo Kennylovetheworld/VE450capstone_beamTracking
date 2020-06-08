@@ -21,7 +21,6 @@ def create_samples(root, shuffle=True, nat_sort=False):
 		for i, path in enumerate(img_paths):
 			img_paths[i] = path.replace("\\", "/")
 			# img_paths[i] = '../data/dev_dataset_csv/'+path
-		# import pdb; pdb.set_trace()
 		sample = list( zip(img_paths,beams) )
 		data_samples.append(sample)
 
@@ -29,6 +28,27 @@ def create_samples(root, shuffle=True, nat_sort=False):
 		random.shuffle(data_samples)
 	print('list is ready')
 	return data_samples
+
+
+def create_images_arr():
+	"""Create images array.
+	Needed when no pickle file exists.
+	"""
+	dir_name = "../data/dev_dataset_csv/visual_data/instance"
+	images = []
+	for idx in range(1, 3997):
+		# import pdb; pdb.set_trace()
+		filename = dir_name+str(idx)+'/cam'
+		for cam in range(1, 7):
+			imgname = filename+str(cam)+'.jpg'
+			image = io.imread(imgname)
+			image = transform.resize(image, (160, 256))
+			image = util.img_as_ubyte(image)
+			images.append(image)
+	images = np.stack(images, axis=0)
+	outfile = '../data/dev_dataset_csv/train_data.pkl'
+	with open(outfile, 'wb') as outputf:
+		pickle.dump(images, outputf, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 #########################################################
@@ -50,7 +70,10 @@ class DataFeed(Dataset):
 		self.transform = transform
 		self.seq_len = n
 		self.img_dim = img_dim
+		# import pdb; pdb.set_trace()
 		imagefile = '../data/dev_dataset_csv/train_data.pkl'
+		if not os.path.isfile('../data/dev_dataset_csv/train_data.pkl'):
+			create_images_arr()
 		with open(imagefile, 'rb') as inputf:
 			self.images = pickle.load(inputf)
 
@@ -72,7 +95,6 @@ class DataFeed(Dataset):
 			camb = dp[0].find('.jpg')
 			instance = int(dp[0][instances + 8 : instanceb])
 			cam = int(dp[0][instanceb + 4 : camb])
-			# import pdb; pdb.set_trace()
 			image = self.images[(instance - 1) * 6 + cam - 1]
 			image = util.img_as_float(image)
 			image = torch.from_numpy(image)

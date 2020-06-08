@@ -5,6 +5,7 @@ import torch.optim as optimizer
 import numpy as np
 import time
 import pdb
+from tqdm import tqdm
 
 def modelTrain(net,trn_loader,val_loader,options_dict):
     """
@@ -47,17 +48,16 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
 
     print('------------------------------- Commence Training ---------------------------------')
     t_start = time.clock()
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
-        pdb.set_trace()
 
         # Training:
         # ---------
-        for batch, y in tqdm(enumerate(trn_loader), desc='Training...', ncols=100, total= options_dict['train_size']):
+        for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100, total= options_dict['train_size']):
             itr += 1
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
@@ -108,7 +108,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 batch_score = 0
                 
                 with torch.no_grad():
-                    for v_batch, beam in tqdm(enumerate(val_loader), desc='Validating...', ncols=100, total= options_dict['test_size']):
+                    for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100, total= options_dict['test_size']):
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()
