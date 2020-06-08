@@ -78,7 +78,6 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             train_loss.backward()
             opt.step()
             out = out.view(batch_size,options_dict['out_seq'],options_dict['cb_size'])
-            print('evaluting...')
             pred_beams = torch.argmax(out,dim=2)
             targ = targ.view(batch_size,options_dict['out_seq'])
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
