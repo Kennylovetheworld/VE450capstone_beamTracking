@@ -47,6 +47,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
 
     print('------------------------------- Commence Training ---------------------------------')
     t_start = time.clock()
+    import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
         net.train()
@@ -56,8 +57,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
 
         # Training:
         # ---------
-        for batch, (y, img) in enumerate(trn_loader):
-
+        for batch, y in tqdm(enumerate(trn_loader), desc='Training...', ncols=100, total= options_dict['train_size']):
             itr += 1
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
@@ -78,6 +78,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             train_loss.backward()
             opt.step()
             out = out.view(batch_size,options_dict['out_seq'],options_dict['cb_size'])
+            print('evaluting...')
             pred_beams = torch.argmax(out,dim=2)
             targ = targ.view(batch_size,options_dict['out_seq'])
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
@@ -107,7 +108,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 batch_score = 0
                 
                 with torch.no_grad():
-                    for v_batch, beam in enumerate(val_loader):
+                    for v_batch, beam in tqdm(enumerate(val_loader), desc='Validating...', ncols=100, total= options_dict['test_size']):
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()

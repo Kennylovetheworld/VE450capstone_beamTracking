@@ -4,4 +4,5 @@ data/
 env/
 *.jpg
 *.log
+*.pickle
 
