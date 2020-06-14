@@ -103,6 +103,7 @@ with torch.cuda.device(options_dict['gpu_idx']):
                      )
         net = net.cuda()
         encoder = Encoder(options_dict['embed_dim2'])
+        encoder = encoder.cuda()
 
     # Train and test:
     # ---------------

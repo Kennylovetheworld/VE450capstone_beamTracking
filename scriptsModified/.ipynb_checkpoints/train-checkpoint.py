@@ -7,14 +7,16 @@ import time
 import pdb
 from tqdm import tqdm
 
-def modelTrain(net,trn_loader,val_loader,options_dict):
+
+def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
     """
     :param net:
     :param data_samples:
     :param options_dict:
     :return:
     """
-
+    
+    
     # Optimizer:
     # ----------
     if options_dict['solver'] == 'Adam':
@@ -51,6 +53,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
     # import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
+        encoder.train()
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
@@ -59,6 +62,12 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
         # ---------
         for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100):
             itr += 1
+            shape = images.shape
+            images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
+            images = images.cuda()
+            images = encoder(images)
+            images = images.view(shape[0],shape[1],-1)
+            
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
             inp_beams = inp_beams.cuda()
@@ -72,7 +81,8 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             h = h.data[:,:batch_size,:].contiguous().cuda()
 
             opt.zero_grad()
-            out, h = net.forward(inp_beams, h)
+            images = images.cuda()
+            out, h = net.forward(inp_beams, images, h)
             out = out.view(-1,out.shape[-1])
             train_loss = criterion(out, targ)  # (pred, target)
             train_loss.backward()
@@ -83,6 +93,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
             top_1_score = torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1,  keepdim = True) 
                                                 / options_dict['SIGMA'] * options_dict['out_seq'] ) ) / targ.shape[0]
+            
             if np.mod(itr, options_dict['coll_cycle']) == 0:  # Data collection cycle
                 running_train_loss.append(train_loss.item())
                 running_trn_top_1.append(top_1_acc.item())
@@ -103,11 +114,18 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             # -----------
             if np.mod(itr, options_dict['val_freq']) == 0:  # or epoch + 1 == options_dict['num_epochs']:
                 net.eval()
+                encoder.eval()
                 batch_acc = 0
                 batch_score = 0
                 
                 with torch.no_grad():
                     for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
+                        shape = images.shape
+                        images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
+                        images = images.cuda()
+                        images = encoder(images)
+                        images = images.view(shape[0],shape[1],-1)
+                        
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()
@@ -121,7 +139,8 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                         targ = targ.view(batch_size,options_dict['out_seq'])
                         targ = targ.cuda()
                         h_val = net.initHidden(beam.shape[0]).cuda()
-                        out, h_val = net.forward(inp_beams, h_val)
+                        images = images.cuda()
+                        out, h_val = net.forward(inp_beams, beams, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
                         batch_score += torch.sum( torch.exp(torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))

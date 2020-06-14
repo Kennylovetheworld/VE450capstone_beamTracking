@@ -10,9 +10,9 @@ class Encoder(nn.Module):
 
     def __init__(self, embed_size):
         super(Encoder, self).__init__()  
-        resnet = torchvision.models.resnet18(pretrained=True)
-#         resnet = torchvision.models.resnet18()
-#         resnet.load_state_dict(torch.load('../model/resnet18-5c106cde.pth'))
+#         resnet = torchvision.models.resnet18(pretrained=True)
+        resnet = torchvision.models.resnet18()
+        resnet.load_state_dict(torch.load('../model/resnet18-5c106cde.pth'))
         # Remove linear and pool layers (since we're not doing classification)
         modules = list(resnet.children())[:-1]      # delete the last fc layer.
         self.resnet = nn.Sequential(*modules)
@@ -59,8 +59,9 @@ class RecNet(nn.Module):
         self.relu = nn.ReLU()
         # self.softmax = nn.Softmax(dim=1)--> Softmax is implicitly implemented into the cross entropy loss
 
-    def forward(self,x,h):
+    def forward(self,beams,images,h):
         # x = self.image_base(x)
+        x = torch.cat((beams,images),2)
         out, h = self.gru(x,h)
         out = self.relu(out[:,-1*self.out_seq:,:])
         y = self.classifier(out)
