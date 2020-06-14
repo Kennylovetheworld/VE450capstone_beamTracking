@@ -46,7 +46,7 @@ options_dict = {
     'shf_per_epoch': True,
     'num_epochs': 10,
     'batch_size': 64,
-    'val_batch_size': 1000,
+    'val_batch_size': 128,
     'lr': 1e-3,
     'lr_sch': [200],
     'lr_drop_factor':0.1,
@@ -84,7 +84,7 @@ val_feed = DataFeed(root_dir=options_dict['val_data_file'],
                      n=options_dict['inp_seq']+options_dict['out_seq'],
                      img_dim=tuple(options_dict['img_dim']),
                      transform=normalize)
-val_loader = DataLoader(val_feed,batch_size=1000)
+val_loader = DataLoader(val_feed,batch_size=options_dict['val_batch_size'])
 options_dict['test_size'] = val_feed.__len__()
 
 with torch.cuda.device(options_dict['gpu_idx']):

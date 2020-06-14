@@ -140,7 +140,7 @@ def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
                         targ = targ.cuda()
                         h_val = net.initHidden(beam.shape[0]).cuda()
                         images = images.cuda()
-                        out, h_val = net.forward(inp_beams, beams, h_val)
+                        out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
                         batch_score += torch.sum( torch.exp(torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
