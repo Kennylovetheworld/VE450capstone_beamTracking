@@ -8,5 +8,5 @@ env/
 *.pickle
 */checkpoints/
 *.pth
-*/.ipynb_checkpoints/
+scriptsModified/.ipynb_checkpoints/*
 
