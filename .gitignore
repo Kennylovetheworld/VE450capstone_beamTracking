@@ -1,8 +1,11 @@
 __pycache__/
 .vscode/
+*/.*/
 data/
 env/
 *.jpg
 *.log
 *.pickle
+*/checkpoints/
+*.pth
 

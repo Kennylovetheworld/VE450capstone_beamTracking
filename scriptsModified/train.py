@@ -7,14 +7,16 @@ import time
 import pdb
 from tqdm import tqdm
 
-def modelTrain(net,trn_loader,val_loader,options_dict):
+
+def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
     """
     :param net:
     :param data_samples:
     :param options_dict:
     :return:
     """
-
+    
+    
     # Optimizer:
     # ----------
     if options_dict['solver'] == 'Adam':
@@ -51,6 +53,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
     # import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
+        encoder.train()
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
@@ -59,8 +62,16 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
         # ---------
         for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100):
             itr += 1
+            shape = images.shape
+            images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
+#             images = images[0].float()
+            images.cuda()
+            images = encoder(images)
+            images = images.view(shape[0],shape[1],-1)
+            
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
+            inp_beams = torch.cat((inp_beams,images),2)
             inp_beams = inp_beams.cuda()
             targ = y[:, options_dict['inp_seq']:options_dict['inp_seq']+options_dict['out_seq']]\
                    .type(torch.LongTensor)
@@ -83,6 +94,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
             top_1_score = torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1,  keepdim = True) 
                                                 / options_dict['SIGMA'] * options_dict['out_seq'] ) ) / targ.shape[0]
+            
             if np.mod(itr, options_dict['coll_cycle']) == 0:  # Data collection cycle
                 running_train_loss.append(train_loss.item())
                 running_trn_top_1.append(top_1_acc.item())
