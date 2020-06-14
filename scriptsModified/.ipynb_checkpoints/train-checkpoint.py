@@ -4,14 +4,19 @@ import torch.optim as optimizer
 # from torch.utils.data import DataLoader
 import numpy as np
 import time
+import pdb
+from tqdm import tqdm
 
-def modelTrain(net,trn_loader,val_loader,options_dict):
+
+def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
     """
     :param net:
     :param data_samples:
     :param options_dict:
     :return:
     """
+    
+    
     # Optimizer:
     # ----------
     if options_dict['solver'] == 'Adam':
@@ -37,23 +42,32 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
     running_train_loss = []
     running_trn_top_1 = []
     running_val_top_1 = []
+    running_trn_top_1_score = []
+    running_val_top_1_score = []
     train_loss_ind = []
     val_acc_ind = []
 
 
     print('------------------------------- Commence Training ---------------------------------')
     t_start = time.clock()
+    # import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
+        encoder.train()
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
 
         # Training:
         # ---------
-        for batch, y in enumerate(trn_loader):
-
+        for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100):
             itr += 1
+            shape = images.shape
+            images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
+            images = images.cuda()
+            images = encoder(images)
+            images = images.view(shape[0],shape[1],-1)
+            
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
             inp_beams = inp_beams.cuda()
@@ -67,7 +81,8 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             h = h.data[:,:batch_size,:].contiguous().cuda()
 
             opt.zero_grad()
-            out, h = net.forward(inp_beams, h)
+            images = images.cuda()
+            out, h = net.forward(inp_beams, images, h)
             out = out.view(-1,out.shape[-1])
             train_loss = criterion(out, targ)  # (pred, target)
             train_loss.backward()
@@ -76,26 +91,41 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             pred_beams = torch.argmax(out,dim=2)
             targ = targ.view(batch_size,options_dict['out_seq'])
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
+            top_1_score = torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1,  keepdim = True) 
+                                                / options_dict['SIGMA'] * options_dict['out_seq'] ) ) / targ.shape[0]
+            
             if np.mod(itr, options_dict['coll_cycle']) == 0:  # Data collection cycle
                 running_train_loss.append(train_loss.item())
                 running_trn_top_1.append(top_1_acc.item())
+                running_trn_top_1_score.append(top_1_score.item())
                 train_loss_ind.append(itr)
             if np.mod(itr, options_dict['display_freq']) == 0:  # Display frequency
+                # pdb.set_trace()
                 print(
-                    'Epoch No. {0}--Iteration No. {1}-- Mini-batch loss = {2:10.9f} and Top-1 accuracy = {3:5.4f}'.format(
+                    'Epoch No. {0}--Iteration No. {1}-- Mini-batch loss = {2:10.9f}, Top-1 accuracy = {3:5.4f}, Top-1 score = {4:5.4f}'.format(
                     epoch + 1,
                     itr,
                     train_loss.item(),
-                    top_1_acc.item())
+                    top_1_acc.item(),
+                    top_1_score.item())
                     )
 
             # Validation:
             # -----------
             if np.mod(itr, options_dict['val_freq']) == 0:  # or epoch + 1 == options_dict['num_epochs']:
                 net.eval()
+                encoder.eval()
+                batch_acc = 0
                 batch_score = 0
+                
                 with torch.no_grad():
-                    for v_batch, beam in enumerate(val_loader):
+                    for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
+                        shape = images.shape
+                        images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
+                        images = images.cuda()
+                        images = encoder(images)
+                        images = images.view(shape[0],shape[1],-1)
+                        
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()
@@ -109,13 +139,18 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                         targ = targ.view(batch_size,options_dict['out_seq'])
                         targ = targ.cuda()
                         h_val = net.initHidden(beam.shape[0]).cuda()
-                        out, h_val = net.forward(inp_beams, h_val)
+                        images = images.cuda()
+                        out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
-                        batch_score += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
-                    running_val_top_1.append(batch_score.cpu().numpy() / options_dict['test_size'])
+                        batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
+                        batch_score += torch.sum( torch.exp(torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
+                    running_val_top_1.append(batch_acc.cpu().numpy() / options_dict['test_size'])
+                    running_val_top_1_score.append(batch_score.cpu().numpy() / options_dict['test_size'])
                     val_acc_ind.append(itr)
-                    print('Validation-- Top-1 accuracy = {0:5.4f}'.format(
-                        running_val_top_1[-1])
+                    print('Validation-- Top-1 accuracy = {0:5.4f} and Top-1 score = {1:5.4f}'.format(
+                        running_val_top_1[-1],
+                        running_val_top_1_score[-1]
+                        ),
                     )
                 net.train()
 
@@ -131,7 +166,9 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
     print('------------------------ Training Done ------------------------')
     train_info = {'train_loss': running_train_loss,
                   'train_top_1': running_trn_top_1,
+                  'train_top_1_score': running_trn_top_1_score,
                   'val_top_1':running_val_top_1,
+                  'val_top_1_score': running_val_top_1_score,
                   'train_itr':train_loss_ind,
                   'val_itr':val_acc_ind,
                   'train_time':train_time}

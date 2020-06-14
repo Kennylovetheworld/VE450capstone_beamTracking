@@ -1,5 +1,5 @@
 import torch
-from model import RecNet
+from model import RecNet, Encoder
 from train import modelTrain
 from data import DataFeed
 import torchvision.transforms as trf
@@ -31,7 +31,8 @@ options_dict = {
     'cb_size': 128,  # Beam codebook size
     'out_seq': 1,  # Length of the predicted sequence
     'inp_seq': 8, # Length of inp beam and image sequence
-    'embed_dim': 50,  # Dimension of the embedding space (same for images and beam indices)
+    'embed_dim': 50,  # Dimension of the embedding space (for beam indices)
+    'embed_dim2': 256,  # Dimension of the embedding space (for images)
     'hid_dim': 20,  # Dimension of the hidden state of the RNN
     'img_dim': [3, 160, 256],  # Dimensions of the input image
     'out_dim': 128,  # Dimensions of the softmax layers
@@ -44,8 +45,8 @@ options_dict = {
     'solver': 'Adam',
     'shf_per_epoch': True,
     'num_epochs': 10,
-    'batch_size': 512,
-    'val_batch_size': 1000,
+    'batch_size': 64,
+    'val_batch_size': 128,
     'lr': 1e-3,
     'lr_sch': [200],
     'lr_drop_factor':0.1,
@@ -55,9 +56,11 @@ options_dict = {
     'val_freq': 100,
     'prog_plot': True,
     'fig_c': 0,
-    'SIGMA': 0.5
+    'SIGMA': 0.5,
+    "fine_tune_encoder" : False  # fine-tune encoder?
 }
-
+fine_tune_encoder = options_dict['fine_tune_encoder']
+encoder_lr = 1e-4
 
 # Fetch training data
 
@@ -81,7 +84,7 @@ val_feed = DataFeed(root_dir=options_dict['val_data_file'],
                      n=options_dict['inp_seq']+options_dict['out_seq'],
                      img_dim=tuple(options_dict['img_dim']),
                      transform=normalize)
-val_loader = DataLoader(val_feed,batch_size=1000)
+val_loader = DataLoader(val_feed,batch_size=options_dict['val_batch_size'])
 options_dict['test_size'] = val_feed.__len__()
 
 with torch.cuda.device(options_dict['gpu_idx']):
@@ -89,7 +92,7 @@ with torch.cuda.device(options_dict['gpu_idx']):
     # Build net:
     # ----------
     if options_dict['net_type'] == 'gru':
-        net = RecNet(options_dict['embed_dim'],
+        net = RecNet(options_dict['embed_dim'] + options_dict['embed_dim2'],
                      options_dict['hid_dim'],
                      options_dict['out_dim'],
                      options_dict['out_seq'],
@@ -99,10 +102,13 @@ with torch.cuda.device(options_dict['gpu_idx']):
                      options_dict['drop_prob'],
                      )
         net = net.cuda()
+        encoder = Encoder(options_dict['embed_dim2'])
+        encoder = encoder.cuda()
 
     # Train and test:
     # ---------------
-    net, options_dict, train_info = modelTrain(net,
+    net, options_dict, train_info = modelTrain(encoder,
+                                                net,
                                                trn_loader,
                                                val_loader,
                                                options_dict)
