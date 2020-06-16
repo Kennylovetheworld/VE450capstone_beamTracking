@@ -8,7 +8,7 @@ import pdb
 from tqdm import tqdm
 
 
-def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
+def modelTrain(net,trn_loader,val_loader,options_dict):
     """
     :param net:
     :param data_samples:
@@ -53,7 +53,6 @@ def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
     # import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
-        encoder.train()
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
@@ -62,11 +61,8 @@ def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
         # ---------
         for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100):
             itr += 1
-            shape = images.shape
-            images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
-            images = images.cuda()
-            images = encoder(images)
-            images = images.view(shape[0],shape[1],-1)
+            # images = encoder(images)
+            # images = images.view(shape[0],shape[1],-1)
             
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
@@ -81,7 +77,6 @@ def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
             h = h.data[:,:batch_size,:].contiguous().cuda()
 
             opt.zero_grad()
-            images = images.cuda()
             out, h = net.forward(inp_beams, images, h)
             out = out.view(-1,out.shape[-1])
             train_loss = criterion(out, targ)  # (pred, target)
@@ -114,18 +109,11 @@ def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
             # -----------
             if np.mod(itr, options_dict['val_freq']) == 0:  # or epoch + 1 == options_dict['num_epochs']:
                 net.eval()
-                encoder.eval()
                 batch_acc = 0
                 batch_score = 0
                 
                 with torch.no_grad():
                     for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
-                        shape = images.shape
-                        images = images.view(shape[0]*shape[1],shape[2],shape[3],shape[4]).float()
-                        images = images.cuda()
-                        images = encoder(images)
-                        images = images.view(shape[0],shape[1],-1)
-                        
                         init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
                         inp_beams = embed(init_beams)
                         inp_beams = inp_beams.cuda()
@@ -139,7 +127,6 @@ def modelTrain(encoder,net,trn_loader,val_loader,options_dict):
                         targ = targ.view(batch_size,options_dict['out_seq'])
                         targ = targ.cuda()
                         h_val = net.initHidden(beam.shape[0]).cuda()
-                        images = images.cuda()
                         out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )

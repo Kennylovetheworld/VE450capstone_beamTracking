@@ -1,5 +1,5 @@
 import torch
-from model import RecNet, Encoder
+from model import RecNet
 from train import modelTrain
 from data import DataFeed
 import torchvision.transforms as trf
@@ -32,8 +32,8 @@ options_dict = {
     'out_seq': 1,  # Length of the predicted sequence
     'inp_seq': 8, # Length of inp beam and image sequence
     'embed_dim': 50,  # Dimension of the embedding space (for beam indices)
-    'embed_dim2': 256,  # Dimension of the embedding space (for images)
-    'hid_dim': 20,  # Dimension of the hidden state of the RNN
+    'embed_dim_img': 256,  # Dimension of the embedding space (for images)
+    'hid_dim': 128,  # Dimension of the hidden state of the RNN
     'img_dim': [3, 160, 256],  # Dimensions of the input image
     'out_dim': 128,  # Dimensions of the softmax layers
     'num_rec_lay': 2,  # Depth of the recurrent network
@@ -53,7 +53,7 @@ options_dict = {
     'wd': 0,
     'display_freq': 50,
     'coll_cycle': 50,
-    'val_freq': 100,
+    'val_freq': 5000,
     'prog_plot': True,
     'fig_c': 0,
     'SIGMA': 0.5,
@@ -92,23 +92,22 @@ with torch.cuda.device(options_dict['gpu_idx']):
     # Build net:
     # ----------
     if options_dict['net_type'] == 'gru':
-        net = RecNet(options_dict['embed_dim'] + options_dict['embed_dim2'],
+        net = RecNet(options_dict['embed_dim'],
+                     options_dict['embed_dim_img'],
                      options_dict['hid_dim'],
+                     options_dict['inp_seq'],
                      options_dict['out_dim'],
                      options_dict['out_seq'],
                      options_dict['num_rec_lay'],
-                     options_dict['img_dim'],
-                     options_dict['cnn_channels'],
-                     options_dict['drop_prob'],
+                     options_dict['drop_prob']
                      )
         net = net.cuda()
-        encoder = Encoder(options_dict['embed_dim2'])
-        encoder = encoder.cuda()
+        # encoder = Encoder(options_dict['embed_dim_img'])
+        # encoder = encoder.cuda()
 
     # Train and test:
     # ---------------
-    net, options_dict, train_info = modelTrain(encoder,
-                                                net,
+    net, options_dict, train_info = modelTrain(net,
                                                trn_loader,
                                                val_loader,
                                                options_dict)
