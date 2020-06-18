@@ -130,14 +130,14 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                         out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
-                        batch_score += torch.sum( torch.exp(torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
+                        batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
                     running_val_top_1.append(batch_acc.cpu().numpy() / options_dict['test_size'])
                     running_val_top_1_score.append(batch_score.cpu().numpy() / options_dict['test_size'])
                     val_acc_ind.append(itr)
                     print('Validation-- Top-1 accuracy = {0:5.4f} and Top-1 score = {1:5.4f}'.format(
-                        running_val_top_1[-1],
-                        running_val_top_1_score[-1]
-                        ),
+                        	running_val_top_1[-1],
+                        	running_val_top_1_score[-1]
+                        )
                     )
                 net.train()
 
