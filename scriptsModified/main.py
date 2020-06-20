@@ -29,7 +29,7 @@ options_dict = {
     # Net:
     'net_type':'gru',
     'cb_size': 128,  # Beam codebook size
-    'out_seq': 1,  # Length of the predicted sequence
+    'out_seq': 5,  # Length of the predicted sequence
     'inp_seq': 8, # Length of inp beam and image sequence
     'embed_dim': 50,  # Dimension of the embedding space (for beam indices)
     'embed_dim_img': 256,  # Dimension of the embedding space (for images)
@@ -38,7 +38,6 @@ options_dict = {
     'out_dim': 128,  # Dimensions of the softmax layers
     'num_rec_lay': 2,  # Depth of the recurrent network
     'drop_prob': 0.2,
-    'cnn_channels': [16, 64],   # Number of channels of CNN
 
     # Train param
     'gpu_idx': 0,
@@ -53,7 +52,7 @@ options_dict = {
     'wd': 0,
     'display_freq': 50,
     'coll_cycle': 50,
-    'val_freq': 5000,
+    'val_freq': 5,
     'prog_plot': True,
     'fig_c': 0,
     'SIGMA': 0.5,
