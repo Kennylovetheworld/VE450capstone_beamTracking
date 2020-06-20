@@ -50,7 +50,6 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
 
     print('------------------------------- Commence Training ---------------------------------')
     t_start = time.clock()
-    # import pdb; pdb.set_trace()
     for epoch in range(options_dict['num_epochs']):
 
         net.train()
@@ -86,8 +85,9 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             pred_beams = torch.argmax(out,dim=2)
             targ = targ.view(batch_size,options_dict['out_seq'])
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
-            top_1_score = torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1,  keepdim = True) 
-                                                / options_dict['SIGMA'] * options_dict['out_seq'] ) ) / targ.shape[0]
+            # pdb.set_trace()
+            top_1_score = torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
+                                                / options_dict['SIGMA'] / options_dict['out_seq'] ) ) / targ.shape[0]
             
             if np.mod(itr, options_dict['coll_cycle']) == 0:  # Data collection cycle
                 running_train_loss.append(train_loss.item())
@@ -109,8 +109,8 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             # -----------
             if np.mod(itr, options_dict['val_freq']) == 0:  # or epoch + 1 == options_dict['num_epochs']:
                 net.eval()
-                batch_acc = 0
-                batch_score = 0
+                batch_acc = 0.0
+                batch_score = 0.0
                 
                 with torch.no_grad():
                     for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
@@ -130,7 +130,9 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                         out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
-                        batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
+                        # batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
+                        batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
+                                                / options_dict['SIGMA'] / options_dict['out_seq'] ) )
                     running_val_top_1.append(batch_acc.cpu().numpy() / options_dict['test_size'])
                     running_val_top_1_score.append(batch_score.cpu().numpy() / options_dict['test_size'])
                     val_acc_ind.append(itr)

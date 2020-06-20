@@ -24,12 +24,12 @@ options_dict = {
     'img_std':(0.05922,0.06468,0.06174),
     'trn_data_file': '../'+data_dir+'/train_set.csv',
     'val_data_file': '../'+data_dir+'/val_set.csv',
-    'results_file': 'five_beam_results_beam_only_2layeers.mat',
+    'results_file': 'three_beam_results_beam_only_2layeers.mat',
 
     # Net:
     'net_type':'gru',
     'cb_size': 128,  # Beam codebook size
-    'out_seq': 5,  # Length of the predicted sequence
+    'out_seq': 3,  # Length of the predicted sequence
     'inp_seq': 8, # Length of inp beam and image sequence
     'embed_dim': 50,  # Dimension of the embedding space (for beam indices)
     'embed_dim_img': 256,  # Dimension of the embedding space (for images)
@@ -50,9 +50,9 @@ options_dict = {
     'lr_sch': [200],
     'lr_drop_factor':0.1,
     'wd': 0,
-    'display_freq': 50,
-    'coll_cycle': 50,
-    'val_freq': 5,
+    'display_freq': 1000,
+    'coll_cycle': 100,
+    'val_freq': 5000,
     'prog_plot': True,
     'fig_c': 0,
     'SIGMA': 0.5,
