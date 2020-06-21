@@ -7,6 +7,7 @@ import time
 import pdb
 from tqdm import tqdm
 
+alpha_c = 1.
 
 def modelTrain(net,trn_loader,val_loader,options_dict):
     """
@@ -62,7 +63,6 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             itr += 1
             # images = encoder(images)
             # images = images.view(shape[0],shape[1],-1)
-            
             init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
             inp_beams = embed(init_beams)
             inp_beams = inp_beams.cuda()
@@ -76,10 +76,11 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             h = h.data[:,:batch_size,:].contiguous().cuda()
 
             opt.zero_grad()
-            out, h = net.forward(inp_beams, images, h)
+            out, h, alpha = net.forward(inp_beams, images, h)
             out = out.view(-1,out.shape[-1])
             train_loss = criterion(out, targ)  # (pred, target)
-            train_loss.backward()
+            train_loss += alpha_c * ((1. - alpha) ** 2).mean()
+            train_loss.backward(retain_graph=True)
             opt.step()
             out = out.view(batch_size,options_dict['out_seq'],options_dict['cb_size'])
             pred_beams = torch.argmax(out,dim=2)
@@ -127,7 +128,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                         targ = targ.view(batch_size,options_dict['out_seq'])
                         targ = targ.cuda()
                         h_val = net.initHidden(beam.shape[0]).cuda()
-                        out, h_val = net.forward(inp_beams, images, h_val)
+                        out, h_val, _ = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
                         # batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
