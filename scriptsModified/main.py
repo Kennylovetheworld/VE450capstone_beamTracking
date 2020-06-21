@@ -24,12 +24,13 @@ options_dict = {
     'img_std':(0.05922,0.06468,0.06174),
     'trn_data_file': '../'+data_dir+'/train_set.csv',
     'val_data_file': '../'+data_dir+'/val_set.csv',
-    'results_file': 'three_beam_results_beam_only_2layeers.mat',
+    'results_file': '../data/five_beam_results_beam_only_2layeers.mat',
+    'model_file': '../data/best_model.pt',
 
     # Net:
     'net_type':'gru',
     'cb_size': 128,  # Beam codebook size
-    'out_seq': 3,  # Length of the predicted sequence
+    'out_seq': 5,  # Length of the predicted sequence
     'inp_seq': 8, # Length of inp beam and image sequence
     'embed_dim': 50,  # Dimension of the embedding space (for beam indices)
     'embed_dim_img': 256,  # Dimension of the embedding space (for images)
@@ -43,7 +44,7 @@ options_dict = {
     'gpu_idx': 0,
     'solver': 'Adam',
     'shf_per_epoch': True,
-    'num_epochs': 10,
+    'num_epochs': 8,
     'batch_size': 64,
     'val_batch_size': 128,
     'lr': 1e-3,
@@ -51,12 +52,13 @@ options_dict = {
     'lr_drop_factor':0.1,
     'wd': 0,
     'display_freq': 1000,
-    'coll_cycle': 100,
+    'coll_cycle': 50,
     'val_freq': 5000,
     'prog_plot': True,
     'fig_c': 0,
     'SIGMA': 0.5,
-    "fine_tune_encoder" : False  # fine-tune encoder?
+    "fine_tune_encoder" : False,  # fine-tune encoder?
+    'patience': 3   # Early stop
 }
 fine_tune_encoder = options_dict['fine_tune_encoder']
 encoder_lr = 1e-4
@@ -113,16 +115,17 @@ with torch.cuda.device(options_dict['gpu_idx']):
 
     # Plot progress:
     if options_dict['prog_plot']:
-        options_dict['fig_c'] += 1
-        plt.figure(options_dict['fig_c'])
+        # options_dict['fig_c'] += 1
+        fig = plt.figure()
         plt.plot(train_info['train_itr'], train_info['train_top_1'],'-or', label='Train top-1')
-        plt.plot(train_info['train_itr'], train_info['train_top_1_score'],'-or', label='Train top-1')
+        # plt.plot(train_info['train_itr'], train_info['train_top_1_score'],'-or', label='Train top-1')
         plt.plot(train_info['val_itr'], train_info['val_top_1'],'-ob', label='Validation top-1')
-        plt.plot(train_info['val_itr'], train_info['val_top_1_score'],'-ob', label='Validation top-1')
+        # plt.plot(train_info['val_itr'], train_info['val_top_1_score'],'-ob', label='Validation top-1')
         plt.xlabel('Training iteration')
         plt.ylabel('Top-1 accuracy (%)')
         plt.grid(True)
         plt.legend()
-        plt.show()
+        plt.savefig('training plot.jpg')
+        plt.close(fig)
 
     sio.savemat(options_dict['results_file'],train_info)

@@ -8,6 +8,63 @@ import pdb
 from tqdm import tqdm
 
 
+class Callback():
+    def __init__(self): pass
+    def on_batch_begin(self): pass
+    def on_batch_end(self): pass
+    def on_validation_begin(self): pass
+    def on_validation_end(self): pass
+
+class Training(Callback):
+    def __init__(self, embed, options_dict):
+        self.embed = embed
+        self.options_dict = options_dict
+
+    def on_batch_begin(self, beams, images, train=True):
+        init_beams = beams[:, :self.options_dict['inp_seq']].type(torch.LongTensor)
+        inp_beams = self.embed(init_beams)
+        inp_beams = inp_beams.cuda()
+        targ = beams[:, self.options_dict['inp_seq']:self.options_dict['inp_seq']+self.options_dict['out_seq']]\
+                .type(torch.LongTensor)
+        if train:
+            targ = targ.view(-1)
+        targ = targ.cuda()
+        batch_size = beams.shape[0]
+        return targ, batch_size
+
+class Validation(Callback):
+    def __init__(self, options_dict):
+        self.running_val_top_1 = []
+        self.running_val_top_1_score = []
+        self.val_acc_ind = []
+        self.options_dict = options_dict
+        self.best_score = 0.0
+        self.count = 0
+
+    def on_validation_end(self, model, itr, batch_acc, batch_score):
+        self.running_val_top_1.append(batch_acc.cpu().numpy() / self.options_dict['test_size'])
+        self.running_val_top_1_score.append(batch_score.cpu().numpy() / self.options_dict['test_size'])
+        self.val_acc_ind.append(itr)
+        print('Validation-- Top-1 accuracy = {0:5.4f} and Top-1 score = {1:5.4f}'.format(
+                self.running_val_top_1[-1],
+                self.running_val_top_1_score[-1]
+            )
+        )
+        # Early stop
+        if self.running_val_top_1_score[-1] > self.best_score:
+            self.best_score = self.running_val_top_1_score[-1]
+            self.count = 0
+            # Store model
+            torch.save(model.state_dict(), self.options_dict['model_file'])
+        else:
+            self.count += 1
+        
+        return self.count >= self.options_dict['patience']
+    
+    def get_stat(self):
+        return self.running_val_top_1, self.running_val_top_1_score, self.val_acc_ind
+
+
 def modelTrain(net,trn_loader,val_loader,options_dict):
     """
     :param net:
@@ -41,17 +98,21 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
     embed = nn.Embedding(options_dict['cb_size'], options_dict['embed_dim'])
     running_train_loss = []
     running_trn_top_1 = []
-    running_val_top_1 = []
     running_trn_top_1_score = []
-    running_val_top_1_score = []
     train_loss_ind = []
-    val_acc_ind = []
+    stop = False
+    # Initialize Callbacks
+    # ------------------------
+    traincb = Training(embed, options_dict)
+    valcb = Validation(options_dict)
 
 
     print('------------------------------- Commence Training ---------------------------------')
     t_start = time.clock()
     for epoch in range(options_dict['num_epochs']):
 
+        if stop:
+            break
         net.train()
         h = net.initHidden(options_dict['batch_size'])
         h = h.cuda()
@@ -59,20 +120,10 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
         # Training:
         # ---------
         for batch, (y, images) in tqdm(enumerate(trn_loader), desc='Training...', ncols=100):
+            if stop:
+                break
             itr += 1
-            # images = encoder(images)
-            # images = images.view(shape[0],shape[1],-1)
-            
-            init_beams = y[:, :options_dict['inp_seq']].type(torch.LongTensor)
-            inp_beams = embed(init_beams)
-            inp_beams = inp_beams.cuda()
-            targ = y[:, options_dict['inp_seq']:options_dict['inp_seq']+options_dict['out_seq']]\
-                   .type(torch.LongTensor)
-            targ = targ.view(-1)
-            targ = targ.cuda()
-            batch_size = y.shape[0]
-            # if epoch == 1:
-            #     print('pause')
+            targ, batch_size = traincb.on_batch_begin(y, images)
             h = h.data[:,:batch_size,:].contiguous().cuda()
 
             opt.zero_grad()
@@ -114,18 +165,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 
                 with torch.no_grad():
                     for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
-                        init_beams = beam[:, :options_dict['inp_seq']].type(torch.LongTensor)
-                        inp_beams = embed(init_beams)
-                        inp_beams = inp_beams.cuda()
-                        batch_size = beam.shape[0]
-
-                        targ = beam[:,options_dict['inp_seq']:options_dict['inp_seq']+options_dict['out_seq']]\
-                               .type(torch.LongTensor)
-                        # if options_dict['out_seq'] == 1:
-                        #     targ = targ.view(-1)
-                        # else:
-                        targ = targ.view(batch_size,options_dict['out_seq'])
-                        targ = targ.cuda()
+                        targ, _ = traincb.on_batch_begin(beam, images, False)
                         h_val = net.initHidden(beam.shape[0]).cuda()
                         out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
@@ -133,14 +173,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                         # batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
                         batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
                                                 / options_dict['SIGMA'] / options_dict['out_seq'] ) )
-                    running_val_top_1.append(batch_acc.cpu().numpy() / options_dict['test_size'])
-                    running_val_top_1_score.append(batch_score.cpu().numpy() / options_dict['test_size'])
-                    val_acc_ind.append(itr)
-                    print('Validation-- Top-1 accuracy = {0:5.4f} and Top-1 score = {1:5.4f}'.format(
-                        	running_val_top_1[-1],
-                        	running_val_top_1_score[-1]
-                        )
-                    )
+                    stop = valcb.on_validation_end(net, itr, batch_acc, batch_score)
                 net.train()
 
         current_lr = scheduler.get_lr()[-1]
@@ -153,6 +186,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
     train_time = (t_end - t_start)/60
     print('Training lasted {0:6.3f} minutes'.format(train_time))
     print('------------------------ Training Done ------------------------')
+    running_val_top_1, running_val_top_1_score, val_acc_ind = valcb.get_stat()
     train_info = {'train_loss': running_train_loss,
                   'train_top_1': running_trn_top_1,
                   'train_top_1_score': running_trn_top_1_score,
