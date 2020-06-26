@@ -30,7 +30,7 @@ class Training(Callback):
             targ = targ.view(-1)
         targ = targ.cuda()
         batch_size = beams.shape[0]
-        return targ, batch_size
+        return inp_beams, targ, batch_size
 
 class Validation(Callback):
     def __init__(self, options_dict):
@@ -123,7 +123,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             if stop:
                 break
             itr += 1
-            targ, batch_size = traincb.on_batch_begin(y, images)
+            inp_beams, targ, batch_size = traincb.on_batch_begin(y, images)
             h = h.data[:,:batch_size,:].contiguous().cuda()
 
             opt.zero_grad()
@@ -137,7 +137,7 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
             targ = targ.view(batch_size,options_dict['out_seq'])
             top_1_acc = torch.sum( torch.prod(pred_beams == targ, dim=1, dtype=torch.float) ) / targ.shape[0]
             # pdb.set_trace()
-            top_1_score = torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
+            top_1_score = torch.sum( torch.exp( -torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
                                                 / options_dict['SIGMA'] / options_dict['out_seq'] ) ) / targ.shape[0]
             
             if np.mod(itr, options_dict['coll_cycle']) == 0:  # Data collection cycle
@@ -165,13 +165,13 @@ def modelTrain(net,trn_loader,val_loader,options_dict):
                 
                 with torch.no_grad():
                     for v_batch, (beam, images) in tqdm(enumerate(val_loader), desc='Validating...', ncols=100):
-                        targ, _ = traincb.on_batch_begin(beam, images, False)
+                        inp_beams, targ, _ = traincb.on_batch_begin(beam, images, False)
                         h_val = net.initHidden(beam.shape[0]).cuda()
                         out, h_val = net.forward(inp_beams, images, h_val)
                         pred_beams = torch.argmax(out, dim=2)
                         batch_acc += torch.sum( torch.prod( pred_beams == targ, dim=1, dtype=torch.float ) )
                         # batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float) / options_dict['SIGMA'] ))
-                        batch_score += torch.sum( torch.exp( - torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
+                        batch_score += torch.sum( torch.exp( -torch.norm( pred_beams - targ, 1, dtype=torch.float, dim = 1) 
                                                 / options_dict['SIGMA'] / options_dict['out_seq'] ) )
                     stop = valcb.on_validation_end(net, itr, batch_acc, batch_score)
                 net.train()
