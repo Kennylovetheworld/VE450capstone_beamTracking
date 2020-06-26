@@ -35,6 +35,7 @@ options_dict = {
     'embed_dim': 50,  # Dimension of the embedding space (for beam indices)
     'embed_dim_img': 256,  # Dimension of the embedding space (for images)
     'hid_dim': 128,  # Dimension of the hidden state of the RNN
+    'attention_dim': 128,
     'img_dim': [3, 160, 256],  # Dimensions of the input image
     'out_dim': 128,  # Dimensions of the softmax layers
     'num_rec_lay': 2,  # Depth of the recurrent network
@@ -45,7 +46,7 @@ options_dict = {
     'solver': 'Adam',
     'shf_per_epoch': True,
     'num_epochs': 10,
-    'batch_size': 64,
+    'batch_size': 32,
     'val_batch_size': 128,
     'lr': 1e-3,
     'lr_sch': [200],
@@ -97,6 +98,7 @@ with torch.cuda.device(options_dict['gpu_idx']):
                      options_dict['embed_dim_img'],
                      options_dict['hid_dim'],
                      options_dict['inp_seq'],
+                     options_dict['attention_dim'],
                      options_dict['out_dim'],
                      options_dict['out_seq'],
                      options_dict['num_rec_lay'],
