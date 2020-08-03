@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision
 import os
 import pdb
@@ -32,7 +33,7 @@ import pdb
 #         features = self.bn(self.linear(features))
 #         return features
 
-class Attention(nn.Module):
+class img_Attention(nn.Module):
     """
     Attention Network.
     """
@@ -43,20 +44,28 @@ class Attention(nn.Module):
         :param decoder_dim: size of decoder's RNN
         :param attention_dim: size of the attention network
         """
-        super(Attention, self).__init__()
+        super(img_Attention, self).__init__()
         self.encoder_att = nn.Linear(encoder_dim, attention_dim)  # linear layer to transform encoded image
         self.decoder_att = nn.Linear(decoder_dim, attention_dim)  # linear layer to transform decoder's output
         self.full_att = nn.Linear(attention_dim, 1)  # linear layer to calculate values to be softmax-ed
         self.relu = nn.ReLU()
         self.softmax = nn.Softmax(dim=1)  # softmax layer to calculate weights
 
-    def forward(self, encoder_out, decoder_hidden):
+    def forward(self, images, beams):
         """
         Forward propagation.
         :param encoder_out: encoded images, a tensor of dimension (batch_size, num_pixels, encoder_dim)
         :param decoder_hidden: previous decoder output, a tensor of dimension (batch_size, decoder_dim)
         :return: attention weighted encoding, weights
         """
+
+        # seq_num = images.shape[1]
+        # assert seq_num = beams.shape[1]
+        # for i in range(seq_num):
+        #     image = images[:,i]
+        #     beam = beams[:,i]
+
+
 
         att1 = self.encoder_att(encoder_out)  # (batch_size, seq, attention_dim)
         att2 = self.decoder_att(decoder_hidden)  # (num_layer , batch_size, attention_dim)
@@ -65,10 +74,12 @@ class Attention(nn.Module):
         attention_weighted_encoding = (encoder_out.unsqueeze(0) * alpha.unsqueeze(3)).sum(dim=0)  # (batch_size, seq, encoder_dim)
         return attention_weighted_encoding, alpha
 
+
 # Beam prediction model relying on input beam sequences alone
 class RecNet(nn.Module):
     def __init__(self,
                  beam_dim,
+                 cb_size,
                  img_dim,
                  hid_dim,
                  inp_seq,
@@ -81,14 +92,17 @@ class RecNet(nn.Module):
         super(RecNet, self).__init__()
         self.hid_dim = hid_dim
         self.out_seq = out_seq
+        self.out_dim = out_dim
         # self.orig_dim = orig_dim
         self.num_layers = num_layers
         self.inp_seq = inp_seq
 
         # Define layers
-        self.gru = nn.GRU(beam_dim+img_dim,hid_dim,num_layers,batch_first=True,dropout=drop_prob)
-        self.classifier = nn.Linear(hid_dim,out_dim)
+        self.gru = nn.GRU(beam_dim+img_dim, hid_dim, num_layers, batch_first=True, dropout=drop_prob)
+        self.decoder_gru = nn.GRU(beam_dim, hid_dim, num_layers, batch_first=True, dropout=drop_prob)
         self.relu = nn.ReLU()
+        self.att_linear = nn.Linear(hid_dim * 2, out_dim)
+        self.beam_embed = nn.Embedding(cb_size, beam_dim)
 
         #ResNet-18
         resnet = torchvision.models.resnet18()
@@ -102,9 +116,12 @@ class RecNet(nn.Module):
         # self.softmax = nn.Softmax(dim=1)--> Softmax is implicitly implemented into the cross entropy loss
 
         # attention network
-        self.attention = Attention(img_dim, hid_dim, attention_dim)  
+        # self.attention = Attention(img_dim, hid_dim, attention_dim)  
 
-    def forward(self,beams,images,h):
+    def forward(self, beams, images, h, ifTrain = False):
+        # train 时输入8个images和13个beams
+        # test 时输入8个images和8个beams 剩下的beams利用预测出的argmax beam来实现
+
         # x = self.image_base(x)
         # ResNet
         shape = images.shape
@@ -114,16 +131,32 @@ class RecNet(nn.Module):
         images = images.reshape(images.size(0), -1)
         images = self.bn(self.linear(images))
         images = images.view(shape[0],self.inp_seq,-1)
-        images, alpha = self.attention(images,h)
+        # images_att, alpha = self.img_attention(images,beams)
 
-        x = torch.cat((beams,images),2)
-        # pdb.set_trace()
+        x = torch.cat((beams[:, :self.inp_seq, :], images),2)
+
+        y = torch.zeros(shape[0], self.out_seq, self.out_dim).cuda()
+
         out, h = self.gru(x,h)
-        out = self.relu(out[:,-1*self.out_seq:,:])
-        y = self.classifier(out)
-        # y = self.softmax(out)
-        return [y, h, alpha]
+        decoder_input = beams[:, self.inp_seq - 1].view(shape[0], 1, -1)
+        for i in range(self.out_seq):
+            decoder_out, h = self.decoder_gru(decoder_input, h) # batch * 1 * hid_dim
+            decoder_out = decoder_out.view(shape[0], self.hid_dim, 1) # batch * hid_dim * 1
+            attention = F.softmax(torch.bmm(out, decoder_out), dim=1) # batch * inp_seq * 1
+            attention = attention.view(shape[0], 1, self.inp_seq) # batch * 1 * inp_seq
+            tmp_hid = torch.bmm(attention, out) # batch * 1 * hid_dim
+            decoder_input = torch.cat((tmp_hid.view(shape[0], self.hid_dim), decoder_out.view(shape[0], self.hid_dim)), 1) # batch * 2 hid_dim
+            decoder_input = self.att_linear(decoder_input) # batch * out_dim
+            y[:,i,:] = decoder_input
+
+            if ifTrain:
+                decoder_input = beams[:, self.inp_seq + i].view(shape[0], 1, -1)
+            else:
+                index = torch.argmax(F.softmax(decoder_input, dim=1), dim=1) # batch, 
+                index = index.view(-1, 1) # batch * 1
+                decoder_input = self.beam_embed(index) # batch * 1 * embed_dim
+        
+        return [y, h]
 
     def initHidden(self,batch_size):
-        return torch.zeros( (self.num_layers,batch_size,self.hid_dim) )
-
+        return torch.zeros((self.num_layers, batch_size, self.hid_dim))
