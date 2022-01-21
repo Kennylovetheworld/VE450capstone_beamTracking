@@ -5,7 +5,7 @@ cycler==0.10.0
 decorator==4.4.2
 h5py==2.10.0
 ipykernel==5.2.0
-ipython==6.5.0
+ipython==7.16.3
 ipython-genutils==0.2.0
 jedi==0.16.0
 jupyter-client==6.1.2
